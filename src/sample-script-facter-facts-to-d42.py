@@ -17,13 +17,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 # Script tested with python 2.4
 ################################################################
 
-
+import requests
+from requests.auth import HTTPBasicAuth
 import types
 import os.path
-import urllib
-import urllib2
 import traceback
-import base64
 import sys
 import glob
 import math
@@ -44,30 +42,30 @@ puppetdir="/var/opt/lib/pe-puppet/yaml/node/"  #Change to reflect node directory
 def post(url, params):
     """http post with basic-auth params is dict like object"""
     try:
-        data= urllib.urlencode(params) # convert to ascii chars
+        data= params
         headers = {
-            'Authorization' : 'Basic '+ base64.b64encode(USER + ':' + PASSWORD),
             'Content-Type' : 'application/x-www-form-urlencoded'
         }
 
         if DRY_RUN:
-            print url, headers, data
+            print(url, headers, data)
         else:
-            req = urllib2.Request(url, data, headers)
-            print '---REQUEST---',req.get_full_url()
-            print req.headers
-            print req.data
+            print('---REQUEST---', url)
+            print(headers)
+            print(data)
 
-            response = urllib2.urlopen(req)
-            print '---RESPONSE---'
-            print response.read()
+            req = requests.post(url, data=data, headers=headers, auth=HTTPBasicAuth(USER, PASSWORD))
 
-    except Exception, Err:
-        print '-----EXCEPTION OCCURED-----'
-        print str(Err)
+            print('---RESPONSE---')
+            print(req.status_code)
+            print(req.text)
+    except Exception as Err:
+        print('-----EXCEPTION OCCURED-----')
+        print(Err)
+
 def to_ascii(s):
     """remove non-ascii characters"""
-    if type(s) == types.StringType:
+    if isinstance(s, str):
         return s.encode('ascii','ignore')
     else:
         return str(s)        
@@ -82,7 +80,7 @@ for infile in glob.glob( os.path.join(puppetdir, '*yaml') ):
     d = {}
            
     f = open(infile)
-    print "---Going through fact file: %s" % infile
+    print("---Going through fact file: %s" % infile)
     for line in f:
         if "--" not in line:
 

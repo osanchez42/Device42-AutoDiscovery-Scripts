@@ -24,10 +24,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import types
 import os.path
-import urllib
-import urllib2
 import traceback
-import base64
+import requests
+from requests.auth import HTTPBasicAuth
 import System
 import clr
 import math
@@ -52,38 +51,32 @@ IGNORE_ALL_SERVICES_RUNNING_AS_LOCALSYSTEM = False         #If you just want to 
 DRY_RUN = False                                            #Set to True to NOT post to D42 and just print the parameters that will be sent
 DEBUG = False
 
+
 def post(params):
     """http post with basic-auth params is dict like object"""
     try:
-        data= urllib.urlencode(params) # convert to ascii chars
+        data = params  # convert to ascii chars
         headers = {
-            'Authorization' : 'Basic '+ base64.b64encode(D42_USER + ':' + D42_PASSWORD),
             'Content-Type'  : 'application/x-www-form-urlencoded'
         }
 
         if DRY_RUN:
-            print params
+            print(params)
         else:
-            req = urllib2.Request(D42_URL, data, headers)
+            req = requests.post(D42_URL, data=data, headers=headers)
 
-            if DEBUG: print '---REQUEST---',req.get_full_url()
-            if DEBUG: print req.headers
-            if DEBUG: print req.data
+            if DEBUG:
+                print('---REQUEST---', D42_URL)
+                print(headers)
+                print(data)
 
-            reponse = urllib2.urlopen(req)
-
-            if DEBUG: print '---RESPONSE---'
-            if DEBUG: print reponse.getcode()
-            if DEBUG: print reponse.info()
-            print reponse.read()
-    except urllib2.HTTPError as err:
-        print '---RESPONSE---'
-        if DEBUG: print err.getcode()
-        if DEBUG: print err.info()
-        if DEBUG: print err.read()
-    except urllib2.URLError as err:
-        print '---RESPONSE---'
-        print err
+            if DEBUG:
+                print('---RESPONSE---')
+                print(req.status_code)
+                print(req.text)
+    except Exception as err:
+        print('---RESPONSE---')
+        print(err)
 
 def get_computers():
     """Enumerates ALL computer objects in AD"""
@@ -107,12 +100,12 @@ def get_fromfile():
     to the text file when prompted.
     """
     while True:
-        filename = raw_input('Enter the path for the text file: ')
+        filename = input('Enter the path for the text file: ')
         if filename:
             if not os.path.exists(filename):
-                print "file not exists or insufficient permissions '%s'" % filename
+                print("file not exists or insufficient permissions '%s'" % filename)
             elif not os.path.isfile(filename):
-                print "not a file, may be a dir '%s'" % filename
+                print("not a file, may be a dir '%s'" % filename)
             else:
                 f = open(filename)
                 try: computers = [line.strip() for line in f]
@@ -122,7 +115,7 @@ def get_fromfile():
 def get_frommanualentry():
     """'SingleEntry' - Enumerates Computer from user input"""
     while True:
-        c = raw_input('Enter Computer Name or IP: ')
+        c = input('Enter Computer Name or IP: ')
         if c: return [c]
 
 def wmi(query):
@@ -132,7 +125,7 @@ def wmi(query):
 
 def to_ascii(s):
     """remove non-ascii characters"""
-    if type(s) == types.StringType:
+    if isinstance(s, str):
         return s.encode('ascii','ignore')
     else:
         return str(s)
@@ -144,7 +137,7 @@ def main():
 | Domain Admin rights are required to enumerate information |
 +----------------------------------------------------+
     """
-    print banner
+    print(banner)
 
     menu="""\
 Which computer resources would you like to run auto-discovery on?
@@ -154,14 +147,14 @@ Which computer resources would you like to run auto-discovery on?
     [4] Choose a Computer manually
     """
     while True:
-        resp = raw_input(menu)
+        resp = input(menu)
         if   resp == '1': computers = get_computers(); break
         elif resp == '2': computers = get_servers(); break
         elif resp == '3': computers = get_fromfile(); break
         elif resp == '4': computers = get_frommanualentry(); break
 
     if not computers:
-        print "ERROR: No computer found"
+        print("ERROR: No computer found")
     else:
         for c in computers:
             try:
@@ -182,9 +175,10 @@ Which computer resources would you like to run auto-discovery on?
                                 if ADD_SERVICE_ACCOUNT_AS_DEPENDENCY and service.get('StartName').lower() != 'localsystem' :
                                     args.update({'depends_on': SERVICE_ACCOUNT_PREFIX + service.get('StartName')})
                                 try: post(args)
-                                except Exception, err: print 'Post to D42 failed with error', str(err)
-            except Exception, err:
-                print 'failed for machine', c, str(err)
+                                except Exception as err:
+                                    print ('Post to D42 failed with error', str(err))
+            except Exception as err:
+                print('failed for machine', c, str(err))
 
 if __name__=="__main__":
     main()

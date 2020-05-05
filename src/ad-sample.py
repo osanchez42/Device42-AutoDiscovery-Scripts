@@ -23,7 +23,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ##############################################
 
 import os.path
-import urllib
 import requests
 from requests.auth import HTTPBasicAuth
 import clr
@@ -40,11 +39,10 @@ from System.Management.Automation import RunspaceInvoke
 # create a runspace to run shell commands from
 RUNSPACE = RunspaceInvoke()
 
-BASE_URL = 'https://your-url-here'  # make sure to NOT to end in /
-
 API_DEVICE_URL = BASE_URL + '/api/device/'
 API_IP_URL = BASE_URL + '/api/ip/'
 
+BASE_URL = 'https://your-url-here'  # make sure to NOT to end in /
 USER = 'put-your-user-name-here'
 PASSWORD = 'put-your-password-here'
 

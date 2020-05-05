@@ -144,8 +144,8 @@ class IP(object):
             self.dq = ip.dq
             self.v = ip.v
             self.mask = ip.mask
-        elif isinstance(ip, (int, long)):
-            self.ip = long(ip)
+        elif isinstance(ip, int):
+            self.ip = int(ip)
             if self.ip <= 0xffffffff:
                 self.v = version or 4
                 self.dq = self._itodq(ip)
@@ -165,10 +165,10 @@ class IP(object):
         if self.mask is None:
             self.mask = self.v == 4 and 32 or 128
         # Netmask is numeric CIDR subnet
-        elif isinstance(self.mask, (int, long)) or self.mask.isdigit():
+        elif isinstance(self.mask, int) or self.mask.isdigit():
             self.mask = int(self.mask)
         # Netmask is in subnet notation
-        elif isinstance(self.mask, basestring):
+        elif isinstance(self.mask, str):
             limit = [32, 128][':' in self.mask]
             inverted = ~self._dqtoi(self.mask)
             count = 0
@@ -243,8 +243,8 @@ class IP(object):
         '''
         # hex notation
         if dq.startswith('0x'):
-            ip = long(dq[2:], 16)
-            if ip > 0xffffffffffffffffffffffffffffffffL:
+            ip = int(dq[2:], 16)
+            if ip > 0xffffffffffffffffffffffffffffffff:
                 raise ValueError('%s: IP address is bigger than 2^128' % dq)
             if ip <= 0xffffffff:
                 self.v = 4
@@ -273,7 +273,7 @@ class IP(object):
                         'compressed format malformed' % dq)
                 ix = hx.index('')
                 px = len(hx[ix + 1:])
-                for x in xrange(ix + px + 1, 8):
+                for x in range(ix + px + 1, 8):
                     hx.insert(ix, '0')
             elif dq.endswith('::'):
                 pass
@@ -290,11 +290,12 @@ class IP(object):
                         'hexlets should be between 0x0000 and 0xffff' % dq)
                 ip += h
             self.v = 6
-            return long(ip, 16)
+            return int(ip, 16)
         elif len(dq) == 32:
             # Assume full heximal notation
             self.v = 6
-            return long(h, 16)
+            # ???
+            return int(h, 16)
 
         # IPv4
         if '.' in dq:
@@ -310,7 +311,7 @@ class IP(object):
             while len(q) < 4:
                 q.insert(1, '0')
             self.v = 4
-            return sum(long(byte) << 8 * index for index, byte in enumerate(q))
+            return sum(int(byte) << 8 * index for index, byte in enumerate(q))
 
         raise ValueError('Invalid address input')
 
@@ -327,7 +328,7 @@ class IP(object):
             ]))
         else:
             n = '%032x' % n
-            return ':'.join(n[4 * x:4 * x + 4] for x in xrange(0, 8))
+            return ':'.join(n[4 * x:4 * x + 4] for x in range(0, 8))
 
     def __str__(self):
         '''
@@ -346,19 +347,19 @@ class IP(object):
         return self.ip
 
     def __lt__(self, other):
-        return long(self) < long(IP(other))
+        return int(self) < int(IP(other))
 
     def __le__(self, other):
-        return long(self) <= long(IP(other))
+        return int(self) <= int(IP(other))
 
     def __ge__(self, other):
-        return long(self) >= long(IP(other))
+        return int(self) >= int(IP(other))
 
     def __gt__(self, other):
-        return long(self) > long(IP(other))
+        return int(self) > int(IP(other))
 
     def __eq__(self, other):
-        return long(self) == long(IP(other))
+        return int(self) == int(IP(other))
 
     def size(self):
         return 1
@@ -386,11 +387,11 @@ class IP(object):
             return self
         else:
             if self.bin().startswith('0' * 96):
-                return IP(long(self), version=4)
+                return IP(int(self), version=4)
             elif self.bin().startswith('0' * 80 + '1' * 16):
-                return IP(long(self) & 0xffffffff, version=4)
-            elif long(self) & 0x20020000000000000000000000000000L:
-                return IP((long(self) - 0x20020000000000000000000000000000L) >> 80, version=4)
+                return IP(int(self) & 0xffffffff, version=4)
+            elif int(self) & 0x20020000000000000000000000000000:
+                return IP((int(self) - 0x20020000000000000000000000000000) >> 80, version=4)
             else:
                 return ValueError('%s: IPv6 address is not IPv4 compatible or mapped, '
                     'nor an 6-to-4 IP' % self.dq)
@@ -401,7 +402,7 @@ class IP(object):
         if len(value) == 32:
             return cls(int(value, 2))
         elif len(value) == 128:
-            return cls(long(value, 2))
+            return cls(int(value, 2))
         else:
             return ValueError('%r: invalid binary notation' % (value,))
 
@@ -410,7 +411,7 @@ class IP(object):
         if len(value) == 8:
             return cls(int(value, 16))
         elif len(value) == 32:
-            return cls(long(value, 16))
+            return cls(int(value, 16))
         else:
             raise ValueError('%r: invalid hexadecimal notation' % (value,))
 
@@ -431,11 +432,11 @@ class IP(object):
         assert type in ['6-to-4', 'compat', 'mapped'], 'Conversion type not supported'
         if self.v == 4:
             if type == '6-to-4':
-                return IP(0x20020000000000000000000000000000L | long(self) << 80, version=6)
+                return IP(0x20020000000000000000000000000000 | int(self) << 80, version=6)
             elif type == 'compat':
-                return IP(long(self), version=6)
+                return IP(int(self), version=6)
             elif type == 'mapped':
-                return IP(0xffff << 32 | long(self), version=6)
+                return IP(0xffff << 32 | int(self), version=6)
         else:
             return self
 
@@ -496,9 +497,9 @@ class Network(IP):
         4278190080
         '''
         if self.version() == 4:
-            return (0xffffffffL >> (32 - self.mask)) << (32 - self.mask)
+            return (0xffffffff >> (32 - self.mask)) << (32 - self.mask)
         else:
-            return (0xffffffffffffffffffffffffffffffffL >> (128 - self.mask)) << (128 - self.mask)
+            return (0xffffffffffffffffffffffffffffffff >> (128 - self.mask)) << (128 - self.mask)
 
     def network(self):
         '''
@@ -541,10 +542,10 @@ class Network(IP):
         2147483647
         '''
         if self.version() == 4:
-            return self.network_long() | (0xffffffffL - self.netmask_long())
+            return self.network_long() | (0xffffffff - self.netmask_long())
         else:
             return self.network_long() \
-                | (0xffffffffffffffffffffffffffffffffL - self.netmask_long())
+                | (0xffffffffffffffffffffffffffffffff - self.netmask_long())
 
     def host_first(self):
         '''
@@ -565,7 +566,7 @@ class Network(IP):
             return self
         elif (self.version() == 4 and self.mask == 31) or \
                 (self.version() == 6 and self.mask == 127):
-            return IP(long(self) + 1, version=self.version())
+            return IP(int(self) + 1, version=self.version())
         else:
             return IP(self.broadcast_long() - 1, version=self.version())
 
@@ -574,7 +575,7 @@ class Network(IP):
         Check if the given IP address is within this network.
         '''
         other = Network(other)
-        return long(other) >= long(self) and long(other) < long(self) + self.size() - other.size() + 1
+        return int(other) >= int(self) and int(other) < int(self) + self.size() - other.size() + 1
 
     def __contains__(self, ip):
         '''
@@ -611,11 +612,11 @@ class Network(IP):
             slice_step = key.step or 1
             arr = list()
             while x < slice_stop:
-                arr.append(IP(long(self) + x))
+                arr.append(IP(int(self) + x))
                 x += slice_step
             return tuple(arr)
         else:
-            return IP(long(self) + key)
+            return IP(int(self) + key)
 
     def __iter__(self):
         '''
@@ -631,8 +632,8 @@ class Network(IP):
         192.168.114.3
         '''
 
-        curr = long(self.host_first())
-        stop = long(self.host_last())
+        curr = int(self.host_first())
+        stop = int(self.host_last())
         while curr <= stop:
             yield IP(curr)
             curr += 1
@@ -676,23 +677,23 @@ if __name__ == '__main__':
 
     for ip, mask, test_ip in tests:
         net = Network(ip, mask)
-        print '==========='
-        print 'ip address:', net
-        print 'to ipv6...:', net.to_ipv6()
-        print 'ip version:', net.version()
-        print 'ip info...:', net.info()
-        print 'subnet....:', net.subnet()
-        print 'num ip\'s..:', net.size()
-        print 'integer...:', long(net)
-        print 'hex.......:', net.hex()
-        print 'netmask...:', net.netmask()
+        print('===========')
+        print('ip address:', net)
+        print('to ipv6...:', net.to_ipv6())
+        print('ip version:', net.version())
+        print('ip info...:', net.info())
+        print('subnet....:', net.subnet())
+        print('num ip\'s..:', net.size())
+        print('integer...:', int(net))
+        print('hex.......:', net.hex())
+        print('netmask...:', net.netmask())
         # Not implemented in IPv6
         if net.version() == 4:
-            print 'network...:', net.network()
-            print 'broadcast.:', net.broadcast()
-        print 'first host:', net.host_first()
-        print 'reverse...:', net.host_first().to_reverse()
-        print 'last host.:', net.host_last()
-        print 'reverse...:', net.host_last().to_reverse()
+            print('network...:', net.network())
+            print('broadcast.:', net.broadcast())
+        print('first host:', net.host_first())
+        print('reverse...:', net.host_first().to_reverse())
+        print('last host.:', net.host_last())
+        print('reverse...:', net.host_last().to_reverse())
         for ip in test_ip:
-            print '%s in network: ' % ip, ip in net
+            print('%s in network: ' % ip, ip in net)

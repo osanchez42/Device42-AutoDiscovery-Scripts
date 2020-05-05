@@ -28,14 +28,13 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 # You might also have to comment out Default Requiretty in /etc/sudoers file.
 #########################################################################################################################################################
 
-
+import requests
 import sys
 import re
 import paramiko
 import math
-import urllib2, urllib
 from base64 import b64encode
-import simplejson as json
+import json
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -92,31 +91,36 @@ def enumerate_ips():
     return iplist
 
 def post(params, what):
-    if what == 'device': THE_URL = D42_API_URL + '/api/device/'
-    elif what == 'ip': THE_URL = D42_API_URL + '/api/ip/'
-    elif what == 'mac': THE_URL = D42_API_URL + '/api/1.0/macs/'
-    data= urllib.urlencode(params)
+    THE_URL = ''
+
+    if what == 'device':
+        THE_URL = D42_API_URL + '/api/device/'
+    elif what == 'ip':
+        THE_URL = D42_API_URL + '/api/ip/'
+    elif what == 'mac':
+        THE_URL = D42_API_URL + '/api/1.0/macs/'
+
+    data = params
+
     headers = {
             'Authorization' : 'Basic '+ b64encode(D42_USERNAME + ':' + D42_PASSWORD),
             'Content-Type' : 'application/x-www-form-urlencoded'
         }
-    req = urllib2.Request(THE_URL, data, headers)
-    if DEBUG: print '---REQUEST---',req.get_full_url()
-    if DEBUG: print req.headers
-    if DEBUG: print req.data
+
     try:
-        r = urllib2.urlopen(req)
-        if r.getcode() == 200:
-            obj = r.read()
-            msg = json.loads(obj)
+        if DEBUG:
+            print('---REQUEST---', THE_URL)
+            print(headers)
+            print(data)
+
+        req = requests.post(THE_URL, data, headers)
+
+        if req.status_code == 200:
+            msg = json.loads(req.text)
             return True, msg
         else:
-            return False, r.getcode()
-    except urllib2.HTTPError, e:
-        error_response = e.read()
-        if DEBUG: print e.code, error_response
-        return False, error_response
-    except Exception,e:
+            return False, req.status_code
+    except Exception as e:
         return False, str(e)
 
 def grab_and_post_inventory_data(machine_name):
@@ -124,14 +128,14 @@ def grab_and_post_inventory_data(machine_name):
         if not USE_KEY_FILE: ssh.connect(str(machine_name), port=PORT, username=LINUX_USER, password=LINUX_PASSWORD, timeout=TIMEOUT)
         else: ssh.connect(str(machine_name), port=PORT, username=LINUX_USER, key_filename=KEY_FILE, timeout=TIMEOUT)
     except paramiko.AuthenticationException:
-        print str(machine_name) + ': authentication failed'
+        print(str(machine_name) + ': authentication failed')
         return None
     except Exception as err:
-        print str(machine_name) + ': ' + str(err)
+        print(str(machine_name) + ': ' + str(err))
         return  None
     devargs = {}
     
-    print '[+] Connecting to: %s' % machine_name
+    print('[+] Connecting to: %s' % machine_name)
     stdin, stdout, stderr = ssh.exec_command("/bin/hostname")
     data_err = stderr.readlines()
     data_out = stdout.readlines()
@@ -143,7 +147,7 @@ def grab_and_post_inventory_data(machine_name):
             devargs.update({'name': device_name})
     else:
         if DEBUG:
-            print data_err
+            print(data_err)
     
     if not device_name:
         return None
@@ -158,7 +162,7 @@ def grab_and_post_inventory_data(machine_name):
                 if uuid and uuid != '': devargs.update({'uuid': uuid})
         else:
             if DEBUG:
-                print data_err
+                print(data_err)
 
 
         if GET_SERIAL_INFO:
@@ -171,7 +175,7 @@ def grab_and_post_inventory_data(machine_name):
                     if serial_no and serial_no != '': devargs.update({'serial_no': serial_no})
             else:
                 if DEBUG:
-                    print data_err
+                    print(data_err)
 
         stdin, stdout, stderr = ssh.exec_command("sudo dmidecode -s system-manufacturer")
         data_err = stderr.readlines()
@@ -195,10 +199,10 @@ def grab_and_post_inventory_data(machine_name):
                             if hardware and hardware != '': devargs.update({'hardware': hardware})
                         else:
                             if DEBUG:
-                                print data_err
+                                print(data_err)
         else:
             if DEBUG:
-                print data_err
+                print(data_err)
 
 
         if GET_OS_DETAILS:
@@ -215,7 +219,7 @@ def grab_and_post_inventory_data(machine_name):
                             })
             else:
                 if DEBUG:
-                    print data_err
+                    print(data_err)
 
 
         if GET_MEMORY_INFO:
@@ -229,7 +233,7 @@ def grab_and_post_inventory_data(machine_name):
                     devargs.update({'memory': memory})
             else:
                 if DEBUG:
-                    print data_err
+                    print(data_err)
 
         if GET_CPU_INFO:
             cpucount = 0
@@ -243,7 +247,7 @@ def grab_and_post_inventory_data(machine_name):
                 cpucount = int(data_out[0].strip())
             else:
                 if DEBUG:
-                    print data_err
+                    print(data_err)
                     
             stdin, stdout, stderr = ssh.exec_command("sudo dmidecode -s processor-frequency")
             data_err = stderr.readlines()
@@ -258,7 +262,7 @@ def grab_and_post_inventory_data(machine_name):
                     if cpuspeed != '': devargs.update({'cpupower': cpuspeed,})
             else:
                 if DEBUG:
-                    print data_err
+                    print(data_err)
 
             stdin, stdout, stderr = ssh.exec_command("sudo dmidecode -t processor")
             data_err = stderr.readlines()
@@ -278,12 +282,12 @@ def grab_and_post_inventory_data(machine_name):
                         devargs.update({'cpucore': corecount})
             else:
                 if DEBUG:
-                    print data_err
+                    print(data_err)
 
         ADDED, msg = post(devargs, 'device')
 
         if ADDED:
-            print str(machine_name) + ': ' + msg['msg'][0]
+            print(str(machine_name) + ': ' + msg['msg'][0])
             device_name_in_d42 = msg['msg'][2]
             stdin, stdout, stderr = ssh.exec_command("/sbin/ifconfig -a") #TODO add just macs     without IPs
             data_err = stderr.readlines()
@@ -295,8 +299,8 @@ def grab_and_post_inventory_data(machine_name):
                 for rec in ipinfo:
                     if 'hwaddr' in rec.lower():
                         mac = re.search(r'([0-9A-F]{2}[:-]){5}([0-9A-F]{2})', rec, re.I).group()
-                        print 'MAC: %s' % mac
-                        print rec.split("\n")[0].split()[0]
+                        print('MAC: %s' % mac)
+                        print(rec.split("\n")[0].split()[0])
                         mac_address = {
                         'macaddress' : mac,
                         'port_name': rec.split("\n")[0].split()[0],
@@ -305,10 +309,10 @@ def grab_and_post_inventory_data(machine_name):
                          }
                         ADDED, msg_mac = post(mac_address, 'mac')
                         if ADDED:
-                            print mac + ': ' + str(msg_mac)
+                            print(mac + ': ' + str(msg_mac))
                         else:
-                            print mac + ': failed with message = ' + str(msg_mac)
-                        print '\n\n'
+                            print(mac + ': failed with message = ' + str(msg_mac))
+                        print('\n\n')
                 # =======  / MAC only =========#
 
                 for i, item in enumerate(ipinfo):
@@ -323,12 +327,14 @@ def grab_and_post_inventory_data(machine_name):
                              }
                             ADDED, msg_ip = post(ip, 'ip')
                             if ADDED:
-                                print ipv4_address + ': ' + str(msg_ip)
+                                print(ipv4_address + ': ' + str(msg_ip))
                             else:
-                                print ipv4_address + ': failed with message = ' + str(msg_ip)
+                                print(ipv4_address + ': failed with message = ' + str(msg_ip))
                         if uploadipv6 and ('inet6 addr' in ipinfo[i+1] or 'inet6 addr' in ipinfo    [i+2]):
-                            if 'inet6 addr' in ipinfo[i+1]: ipv6_address = ipinfo[i+1].split()[2    ].split('/')[0]
-                            else: ipv6_address = ipinfo[i+2].split()[2].split('/')[0]
+                            if 'inet6 addr' in ipinfo[i+1]:
+                                ipv6_address = ipinfo[i+1].split()[2    ].split('/')[0]
+                            else:
+                                ipv6_address = ipinfo[i+2].split()[2].split('/')[0]
                             ip = {
                             'ipaddress': ipv6_address,
                             'tag': item.split("\n")[0].split()[0],
@@ -337,16 +343,16 @@ def grab_and_post_inventory_data(machine_name):
                              }
                             ADDED, msg_ip = post(ip, 'ip')
                             if ADDED:
-                                print ipv6_address + ' : ' + str(msg_ip)
+                                print(ipv6_address + ' : ' + str(msg_ip))
                             else:
-                                print ipv6_address + ': failed with message = ' + str(msg_ip)
+                                print(ipv6_address + ': failed with message = ' + str(msg_ip))
             else:
                 if DEBUG:
-                    print data_err
+                    print(data_err)
         else:
-            print str(machine_name) + ': failed with message: ' + str(msg)
+            print(str(machine_name) + ': failed with message: ' + str(msg))
     else:
-        print str(machine_name) + ': failed with message: ' + "Can't determine hostname (non-unix system?)"
+        print(str(machine_name) + ': failed with message: ' + "Can't determine hostname (non-unix system?)")
     ssh.close()
     return devargs
 
@@ -357,11 +363,11 @@ if USE_IP_RANGE:
 else:
     try: import ipcalc
     except:
-        print 'Unable to import ipcalc.'
-        print 'Please run: pip install git+git://github.com/tehmaze/ipcalc.git@master'
-        print 'or drop ipcalc.py in the same path as this script'
-        print 'or make sure it is installed and in the system path.'
-        print 'https://github.com/tehmaze/ipcalc/blob/master/ipcalc.py'
+        print('Unable to import ipcalc.')
+        print('Please run: pip install git+git://github.com/tehmaze/ipcalc.git@master')
+        print('or drop ipcalc.py in the same path as this script')
+        print('or make sure it is installed and in the system path.')
+        print('https://github.com/tehmaze/ipcalc/blob/master/ipcalc.py')
         sys.exit(0)
     for network in NETWORKS:
         for ip in ipcalc.Network(network):

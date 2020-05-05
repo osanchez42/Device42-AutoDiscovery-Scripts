@@ -24,13 +24,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 # Set GET_OS_DETAILS = False, if you want to ignore OS details
 ###############################################################
 
-import urllib
-import urllib2
 import traceback
+import requests
 from base64 import b64encode
 import subprocess
 import math
-import simplejson as json
+import json
 
 ##### Change Following 11 lines to match your environment #####
 D42_API_URL = 'https://your-d42-IP-or-FQDN-here'  #make sure to not end in /
@@ -50,31 +49,37 @@ def to_ascii(s):  # ignore non-ascii chars
     except: return None
  
 def post(params, what):
-    if what == 'device': THE_URL = D42_API_URL + '/api/device/'
-    elif what == 'ip': THE_URL = D42_API_URL + '/api/ip/'
-    data= urllib.urlencode(params)
+    THE_URL = ''
+
+    if what == 'device':
+        THE_URL = D42_API_URL + '/api/device/'
+    elif what == 'ip':
+        THE_URL = D42_API_URL + '/api/ip/'
+    data = params
+
     headers = {
             'Authorization' : 'Basic '+ b64encode(D42_USERNAME + ':' + D42_PASSWORD),
             'Content-Type' : 'application/x-www-form-urlencoded'
         }
-    req = urllib2.Request(THE_URL, data, headers)
-    if DEBUG: print '---REQUEST---',req.get_full_url()
-    if DEBUG: print req.headers
-    if DEBUG: print req.data
+
+    if DEBUG: print('---REQUEST---', THE_URL)
+    if DEBUG: print(headers)
+    if DEBUG: print(data)
+
     try:
-        r = urllib2.urlopen(req)
-        if r.getcode() == 200:
-            obj = r.read()
-            msg = json.loads(obj)
+        r = requests.post(THE_URL, data=data, headers=headers)
+
+        if r.status_code == 200:
+            msg = json.loads(r.text)
             return True, msg
         else:
-            return False, r.getcode()
-    except urllib2.HTTPError, e:
-        error_response = e.read()
-        if DEBUG: print e.code, error_response
+            return False, r.status_code
+    except Exception as e:
+        error_response = e
+        if DEBUG:
+            print(error_response)
+
         return False, error_response
-    except Exception,e:
-        return False, str(e)
 
 def linux():
     device_name = subprocess.Popen(['/bin/hostname'], shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()[0]
@@ -145,7 +150,7 @@ def linux():
 
     ADDED, msg = post(device, 'device')
     if ADDED:
-        print 'Device done: ' + str(msg)
+        print('Device done: ' + str(msg))
         device_name_in_d42 = msg['msg'][2]
     
         ipinfo = subprocess.Popen(['/sbin/ifconfig', '-a'], shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()[0]
@@ -163,9 +168,9 @@ def linux():
                      }
                     ADDED, msg_ip = post(ip, 'ip')
                     if ADDED:
-                        print ipv4_address + ': ' + str(msg_ip)
+                        print(ipv4_address + ': ' + str(msg_ip))
                     else:
-                        print ipv4_address + ': failed with message = ' + str(msg_ip)
+                        print(ipv4_address + ': failed with message = ' + str(msg_ip))
                 if uploadipv6 and ('inet6 addr' in ipinfo_lines[i+1] or 'inet6 addr' in ipinfo_lines[i+2]):
                     if 'inet6 addr' in ipinfo_lines[i+1]: ipv6_address = ipinfo_lines[i+1].split()[2].split('/')[0]
                     else: ipv6_address = ipinfo_lines[i+2].split()[2].split('/')[0]
@@ -177,26 +182,33 @@ def linux():
                      }
                     ADDED, msg_ip = post(ip, 'ip')
                     if ADDED:
-                        print ipv4_address + ': ' + str(msg_ip)
+                        print(ipv4_address + ': ' + str(msg_ip))
                     else:
-                        print ipv4_address + ': failed with message = ' + str(msg_ip)
+                        print(ipv4_address + ': failed with message = ' + str(msg_ip))
     else:
-        print 'Failed with message: ' + str(msg)
+        print('Failed with message: ' + str(msg))
+
 
 def closest_memory_assumption(v):
-    if v < 512: v = 128 * math.ceil(v / 128.0)
-    elif v < 1024: v = 256 * math.ceil(v / 256.0)
-    elif v < 4096: v = 512 * math.ceil(v / 512.0)
-    elif v < 8192: v = 1024 * math.ceil(v / 1024.0)
-    else: v = 2048 * math.ceil(v / 2048.0)
+    if v < 512:
+        v = 128 * math.ceil(v / 128.0)
+    elif v < 1024:
+        v = 256 * math.ceil(v / 256.0)
+    elif v < 4096:
+        v = 512 * math.ceil(v / 512.0)
+    elif v < 8192:
+        v = 1024 * math.ceil(v / 1024.0)
+    else:
+        v = 2048 * math.ceil(v / 2048.0)
     return int(v)
 
 
 def main():
     try:
         linux()
-    except:
+    except Exception as e:
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()    

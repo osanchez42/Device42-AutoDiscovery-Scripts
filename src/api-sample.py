@@ -18,7 +18,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import clr
 
-clr.AddReference('System.Management') # Added for DateTime Conversion
+clr.AddReference('System.Management')  # Added for DateTime Conversion
 clr.AddReference('System.Management.Automation')
 
 from System.Management.Automation import (
@@ -26,10 +26,9 @@ from System.Management.Automation import (
 )
 RUNSPACE = RunspaceInvoke()
 
-import urllib
-import urllib2
+import requests
+from requests.auth import HTTPBasicAuth
 import traceback
-import base64
 import math
 import ssl
 import functools
@@ -57,38 +56,29 @@ def api_call(url, method, params=None):
     method is string of http method
     params is dict like object
     """
+    data = params
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded'
+    }
+
+    print('---REQUEST---')
+    print(url)
+    print(headers)
+    print(data)
+
     try:
-        data = urllib.urlencode(dict([k, str(v).encode('utf-8')] for k, v in params.items()))  # convert to ascii chars
-        headers = {
-            'Authorization': 'Basic ' + base64.b64encode(USER + ':' + PASSWORD),
-            'Content-Type': 'application/x-www-form-urlencoded'
-        }
+        if method == 'PUT':
+            if params:
+                req = requests.put(url=url, data=data, headers=headers, auth=HTTPBasicAuth(USER, PASSWORD))
+            else:
+                req = requests.post(url=url, headers=headers, auth=HTTPBasicAuth(USER, PASSWORD))
 
-        if params:
-            req = urllib2.Request(url=url, data=data, headers=headers)
-        else:
-            req = urllib2.Request(url=url, headers=headers)
-        if method == 'PUT' :
-            req.get_method = lambda: method
+            print('---RESPONSE---')
+            print(req.status_code)
+            print(req.text)
 
-        print '---REQUEST---', req.get_full_url()
-        print req.headers
-        print req.data
-
-        reponse = urllib2.urlopen(req, context=ssl._create_unverified_context())
-
-        print '---RESPONSE---'
-        print reponse.getcode()
-        print reponse.info()
-        print reponse.read()
-    except urllib2.HTTPError as err:
-        print '---RESPONSE---'
-        print err.getcode()
-        print err.info()
-        print err.read()
-    except urllib2.URLError as err:
-        print '---RESPONSE---'
-        print err
+    except Exception as err:
+        print(err)
 
 
 def to_ascii(s):
@@ -132,10 +122,18 @@ def add_or_update_device():
             'serial_no': to_ascii(bios.get('SerialNumber')).strip(),
             })    
     cpucount = 0
+    cpuspeed = None
+    cpucores = None
+
     for cpu in wmi('Get-WmiObject Win32_Processor  -Namespace "root\CIMV2"'):
         cpucount += 1
-        cpuspeed = cpu.get('MaxClockSpeed')
-        cpucores = cpu.get('NumberOfCores')
+        try:
+            cpuspeed = cpu.get('MaxClockSpeed')
+            cpucores = cpu.get('NumberOfCores')
+        except Exception as e:
+            print(e)
+            continue
+
     if cpucount > 0:
         device.update({
             'cpucount': cpucount,
@@ -164,11 +162,13 @@ def add_or_update_device():
     }
     api_call(API_CUSTOMFIELD_URL, 'PUT', dom)
 
+
 def main():
     try:
         add_or_update_device()
     except:
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()
