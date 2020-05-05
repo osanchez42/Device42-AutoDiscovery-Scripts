@@ -22,7 +22,7 @@ This project contains sample scripts to show how to use Device42 developer APIs 
 
 ### Requirement
 -----------------------------
-   * python 2.7.x
+   * python 3.6.x
    * ad-sample, api-sample and winservice scripts require Poweshell 1.0 or Powershell 2.0, .Net 4 and IronPython 2.7.x.
    * linux_auto_disc_multi requires installation of paramiko library. Install: sudo pip install paramiko (or Ubuntu/Debian: sudo apt-get install python-paramiko)
 
